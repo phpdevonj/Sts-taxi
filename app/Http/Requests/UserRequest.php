@@ -37,12 +37,8 @@ class UserRequest extends FormRequest
     {
         $user_id = auth()->user()->id ?? request()->id;
         $user_type = auth()->user()->user_type ?? request()->user_type;
-   // if used from api endpint profile should string and if used from web endpint profile should image and file
-        if(request()->is('api/*')) {
-            $profile_image = 'nullable|string';
-        } else {
-            $profile_image = 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:1024';
-        } 
+        // if used from api endpint profile should string and if used from web endpint profile should image and file
+        $profile_image = 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:1024';
         $rules = [
             'username'  => 'required|unique:users,username,'.$user_id,
             'email'     => 'required|email|unique:users,email,'.$user_id,
