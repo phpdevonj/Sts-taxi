@@ -80,8 +80,8 @@ trait RideRequestTrait {
             'pick_lng'                  => $ride_request->start_longitude ?? null,
             'drop_lat'                  => $ride_request->end_latitude ?? null,
             'drop_lng'                  => $ride_request->end_longitude ?? null,
-            'multi_location'            => [],
-            'coupon'                    => null,
+            'datetime'                  => $ride_request->datetime ?? null,
+            'coupon'                    => $ride_request->coupon_data ?? null,
             'is_credit_used'            => false,
             'rider_id'                  => $ride_request->rider_id,
         ]);

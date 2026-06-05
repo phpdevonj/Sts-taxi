@@ -27,10 +27,12 @@ class EstimateServiceResource extends JsonResource
         $drop_lat = request('drop_lat');
         $drop_lng = request('drop_lng');
         $multi_location = request('multi_location', []);
+        $datetime = request('datetime') ?? date('Y-m-d H:i');
+        
         // get timezone
         $timezone = optional($this->region)->timezone ?? 'UTC';
-        $date_time = \Carbon\Carbon::now()->setTimezone($timezone)->format('Y-m-d H:i');
-
+        $date_time = \Carbon\Carbon::parse($datetime, $timezone)->setTimezone($timezone)->format('Y-m-d H:i');
+        
         Log::channel('surge')->info('Surge check started', [
             'ride_datetime' => $date_time,
             'region_id'     => $this->region_id,

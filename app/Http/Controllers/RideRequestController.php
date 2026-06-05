@@ -916,6 +916,15 @@ class RideRequestController extends Controller
             return json_message_response(__('message.ride.unauthorized_action'), 403);
         }
 
+        // Step 1: Documents not verified
+        if ($user->is_verified_driver != 1 ) {
+            return json_message_response(__('message.ride.driver_not_verified'));
+        }
+
+        if( $user->status != 'active') {
+            return json_message_response(__('message.ride.driver_not_active'));
+        }
+
         // if(!request()->has('is_accept') && request('is_accept') == 0 ) {
         //     $message = __('message.not_found_entry', ['name' => __('message.riderequest')]);
         //     return json_message_response($message,400);

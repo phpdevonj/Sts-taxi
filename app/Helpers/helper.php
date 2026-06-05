@@ -1247,7 +1247,7 @@ function calculateRideFares($distance_in_unit, $pickupLat, $pickupLng, $dropLat,
     $discount_amount = 0;
     $subtotal = $total_amount;
 
-        if ($coupon) {
+    if ($coupon) {
         $coupon = is_array($coupon) ? (object)$coupon : $coupon;
         if ($coupon->minimum_amount < $total_amount) {
             if ($coupon->discount_type == 'percentage') {
@@ -1294,7 +1294,7 @@ function calculateRideFares($distance_in_unit, $pickupLat, $pickupLng, $dropLat,
     if ($surge_price_setting_value == 1 && isset($surge_price) && (is_object($surge_price) || is_array($surge_price))) {
 
         $timezone = $service?->region?->timezone ?? $service?->timezone ?? 'UTC';
-        $rideTimeOnly = \Carbon\Carbon::createFromFormat('Y-m-d H:i', $ride_datetime, $timezone)->format('H:i');
+        $rideTimeOnly = \Carbon\Carbon::parse($ride_datetime, $timezone)->format('H:i');
         foreach ($surge_price->from_time as $index => $from_time) {
             $to_time = $surge_price->to_time[$index];
 
@@ -1328,7 +1328,7 @@ function calculateRideFares($distance_in_unit, $pickupLat, $pickupLng, $dropLat,
         'distance_price' => (float) number_format( (float) $distance_price, 2,'.',''),
         'time_price' => (float) number_format( (float) $time_price, 2,'.',''),
         'total_amount' => (float) number_format( (float) $total_amount, 2,'.',''),
-        'subtotal' => (float) number_format( (float) $final_subtotal, 2,'.',''),
+        'subtotal' => (float) number_format( (float) $final_subtotal, 2,'.',''), // total amount - coupon discount
         'discount_amount' => $discount_amount,
         'fixed_charge' => (float) number_format( (float) $surge_amount, 2,'.',''),
         'credit_used' => $credit_used ?? 0,
@@ -2207,4 +2207,37 @@ function formatPhoneNumber($number)
     }
 
     return $number;
+}
+
+if (!function_exists('generateUniqueUsername')) {
+
+    function generateUniqueUsername(?string $firstName, ?string $lastName): string 
+    {
+        // 1. Clean and combine names into lowercase alphanumeric only
+        $base = preg_replace('/[^a-z0-9]/', '', strtolower(trim(($firstName ?? '') . ($lastName ?? '')))) ?: 'user';
+
+        // 2. Pad with random numbers if total length is under 6 characters
+        if (($len = strlen($base)) < 6) {
+            $base .= random_int((int)str_repeat('1', 6 - $len), (int)str_repeat('9', 6 - $len));
+        }
+
+        // 3. Fast check: If 'laxmanroriyatesting' is free, take it immediately
+        if (!User::where('username', $base)->exists()) {
+            return $base;
+        }
+
+        // 4. If it exists, fetch all matches starting with 'laxmanroriyatesting'
+        // We use flip() to turn values into array keys for blazing fast O(1) lookups
+        $existing = User::where('username', 'LIKE', "{$base}%")->withTrashed()
+            ->pluck('username')
+            ->flip(); 
+
+        // 5. Safely loop to find the first open slot (e.g., laxmanroriyatesting1, laxmanroriyatesting2)
+        $counter = 1;
+        while ($existing->has($base . $counter)) {
+            $counter++;
+        }
+
+        return $base . $counter;
+    }
 }
