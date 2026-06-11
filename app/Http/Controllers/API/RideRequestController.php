@@ -414,8 +414,6 @@ class RideRequestController extends Controller
         } else {
             $minimum_fare = 0;
         }
-        $total_amount += $extra_charges_amount; // Additional fees
-        
         // if( $service->commission_type == 'fixed' ) {
         //     $commission = $service->admin_commission + $service->fleet_commission;
         //     if( $total_amount <= $commission) {
@@ -484,6 +482,10 @@ class RideRequestController extends Controller
         }
 
         $subtotal = $subtotal + ($surge_amount ? $surge_amount : 0);
+
+        $total_amount = $total_amount + ($extra_charges_amount ? $extra_charges_amount : 0); // Additional fees
+        $subtotal = $subtotal + ($extra_charges_amount ? $extra_charges_amount : 0); // Additional fees
+
 
         return [
             'base_fare'                 => $base_fare,

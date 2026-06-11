@@ -1320,7 +1320,7 @@ function calculateRideFares($distance_in_unit, $pickupLat, $pickupLng, $dropLat,
     }
 
     $final_subtotal = $subtotal + ($surge_amount ? $surge_amount : 0);
-    $driver_earning = $final_subtotal - $company_fee - $expenses;
+    $driver_earning = $total_amount - $company_fee - $expenses;
 
     return [
         'distance' => round($distance_in_unit, 2),
