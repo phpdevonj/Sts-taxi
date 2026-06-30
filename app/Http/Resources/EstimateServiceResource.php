@@ -32,6 +32,9 @@ class EstimateServiceResource extends JsonResource
         // get timezone
         $timezone = optional($this->region)->timezone ?? 'UTC';
         $date_time = \Carbon\Carbon::parse($datetime, $timezone)->setTimezone($timezone)->format('Y-m-d H:i');
+        $surge_price = getSurgePrice($date_time, $this->region_id, $pick_lat, $pick_lng, $drop_lat, $drop_lng);
+        $is_credit_used = request('is_credit_used');
+        $rider_id = request('rider_id');
         
         Log::channel('surge')->info('Surge check started', [
             'ride_datetime' => $date_time,
@@ -39,16 +42,6 @@ class EstimateServiceResource extends JsonResource
             'pickup'        => [$pick_lat, $pick_lng],
             'drop'          => [$drop_lat, $drop_lng],
         ]);
-        $surge_price = getSurgePrice($date_time, $this->region_id, $pick_lat, $pick_lng, $drop_lat, $drop_lng);
-
-        Log::channel('surge')->info('Surge price applied', [
-            'surge_price' => is_object($surge_price)
-                ? $surge_price->toArray()
-                : $surge_price
-        ]);
-        
-        $is_credit_used = request('is_credit_used');
-        $rider_id = request('rider_id');
         
         $service_data = [
             'id'                => $this->id,

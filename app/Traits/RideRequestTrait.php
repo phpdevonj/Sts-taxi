@@ -25,7 +25,7 @@ trait RideRequestTrait {
         $latitude = $ride_request->start_latitude;
         $longitude = $ride_request->start_longitude;
 
-        $cancelled_driver_ids = $ride_request->cancelled_driver_ids ?: [];
+        $cancelled_driver_ids = is_array($ride_request->cancelled_driver_ids) ? $ride_request->cancelled_driver_ids : [];
         
         if (request()->has('is_accept') && request('is_accept') == 0) {
             array_push($cancelled_driver_ids, auth()->user()->id);
@@ -45,7 +45,10 @@ trait RideRequestTrait {
             ->toArray();
 
         $nearby_driver = User::selectRaw("id, user_type, player_id, fcm_token, latitude, longitude, ( $unit_value * acos( cos( radians($latitude) ) * cos( radians( latitude ) ) * cos( radians( longitude ) - radians($longitude) ) + sin( radians($latitude) ) * sin( radians( latitude ) ) ) ) AS distance")
-                        ->where('user_type', 'driver')->where('status', 'active')->where('is_online',1)->where('is_available',1)
+                        ->where('user_type', 'driver')
+                        ->where('status', 'active')
+                        ->where('is_online',1)
+                        ->where('is_available',1)
                         ->where('service_id', $ride_request->service_id )
                         ->whereNotIn('id', $cancelled_driver_ids)
                         ->whereNotIn('id', $busy_driver_ids) // Exclude busy drivers
@@ -60,10 +63,29 @@ trait RideRequestTrait {
         $nearby_driver = $nearby_driver->first();
 
         // get distance and time using google map api
-        $place_details = og_get_distance_matrix($ride_request->start_latitude, $ride_request->start_longitude, $ride_request->end_latitude, $ride_request->end_longitude);
+        $multi_drop_enabled = (int) SettingData('RIDE', 'RIDE_MULTIPLE_DROP_LOCATION') === 1;
+        if ($multi_drop_enabled && !empty($ride_request->multi_drop_location)) {
+            $place_details = og_get_distance_matrix_multiple_destination(
+                $ride_request->start_latitude, 
+                $ride_request->start_longitude, 
+                $ride_request->end_latitude, 
+                $ride_request->end_longitude, 
+                $ride_request->multi_drop_location
+            );
+            $dropoff_distance_in_meters = $place_details['distance'] ?? 0;
+            $dropoff_time_in_seconds = $place_details['duration'] ?? 0;
+        } else {
+            $place_details = og_get_distance_matrix(
+                $ride_request->start_latitude, 
+                $ride_request->start_longitude, 
+                $ride_request->end_latitude, 
+                $ride_request->end_longitude
+            );
 
-        $dropoff_distance_in_meters = distance_value_from_distance_matrix($place_details);
-        $dropoff_time_in_seconds = duration_value_from_distance_matrix($place_details);
+            $dropoff_distance_in_meters = distance_value_from_distance_matrix($place_details) ?? 0;
+            $dropoff_time_in_seconds = duration_value_from_distance_matrix($place_details) ?? 0;
+        }
+
         $distance_in_unit = $dropoff_distance_in_meters ? $dropoff_distance_in_meters / 1000 : 0;
 
         $currency_code = SettingData('CURRENCY', 'CURRENCY_CODE') ?? 'USD';
@@ -80,6 +102,7 @@ trait RideRequestTrait {
             'pick_lng'                  => $ride_request->start_longitude ?? null,
             'drop_lat'                  => $ride_request->end_latitude ?? null,
             'drop_lng'                  => $ride_request->end_longitude ?? null,
+            'multi_location'            => $ride_request->multi_drop_location ?? [],
             'datetime'                  => $ride_request->datetime ?? null,
             'coupon'                    => $ride_request->coupon_data ?? null,
             'is_credit_used'            => false,
@@ -96,6 +119,10 @@ trait RideRequestTrait {
         $driver_earning = $item['driver_earning'] ?? 0;
         
         // \Log::info('nearby_driver-'.$nearby_driver);
+
+        // Initialise here so $notification_data is always defined,
+        // even when $nearby_driver is null (guard before Firebase notify call).
+        $notification_data = [];
 
         if( $nearby_driver != null )
         {
@@ -154,8 +181,13 @@ trait RideRequestTrait {
             $firebaseData = app('firebase.firestore')->database()->collection('rides')->document($document_name);
 
             if ($firebaseData) {
+
+                // DocumentReference is always an object — no falsy check needed.
+                // The null-coalescing on an array literal was also unreachable; fixed below.
                 $rideData = [
-                    'driver_ids' => [$data['riderequest_in_driver_id']] ?? [$ride_request->riderequest_in_driver_id],
+                    'driver_ids' => $data['riderequest_in_driver_id']
+                        ? [$data['riderequest_in_driver_id']]
+                        : [$ride_request->riderequest_in_driver_id],
                     'on_rider_stream_api_call' => 1,
                     'on_stream_api_call' => 1,
                     'ride_id' => $ride_request->id,
@@ -168,7 +200,6 @@ trait RideRequestTrait {
 
                 $firebaseData->set($rideData);
 
-                // $nearby_driver->notify(new RideNotification($notification_data));  
                 if ($nearby_driver) {
                     $nearby_driver->notify(new CommonNotification($notification_data['type'], $notification_data));
                 } else {
@@ -180,7 +211,7 @@ trait RideRequestTrait {
                 return null;
             }
         } catch (\Exception $e) {
-            \Log::error('Error from trait 110: ' . $e->getMessage());
+            \Log::error('Error from trait acceptDeclinedRideRequest: ' . $e->getMessage());
             return null;
         }
         return $ride_request;
