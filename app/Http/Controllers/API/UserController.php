@@ -607,7 +607,34 @@ class UserController extends Controller
                 $user_data = User::where('id',$user->id)->first();
                 $message = __('message.save_form',['form' => $input['user_type'] ]);
             }
-    
+            // bind the account to the device that is logging in now
+            if(request('player_id') != null){
+                $user_data->player_id = request('player_id');
+                // store player_id in firestore
+                if($user_data->uid != null){
+                    try {
+                        $firestore = app('firebase.firestore');
+                        $collection = $firestore->database()->collection('users')->document($user_data->uid);
+                        $collection->update([['path' => 'player_id', 'value' => request('player_id')]]);
+                    } catch (\Exception $e) {
+                        Log::channel('custom_api')->warning('[SOCIAL_LOGIN] Firestore player_id sync failed', [
+                            'uid' => $user_data->uid,
+                            'error' => $e->getMessage(),
+                            'line' => __LINE__
+                        ]);
+                    }
+                }
+            }
+
+            if(request('fcm_token') != null){
+                $user_data->fcm_token = request('fcm_token');
+            }
+            $user_data->last_actived_at = now();
+            $user_data->save();
+
+            // single active session: revoke every token issued to any previous device
+            $user_data->tokens()->delete();
+
             $user_data['api_token'] = $user_data->createToken('auth_token')->plainTextToken;
             $user_data['profile_image'] = getSingleMedia($user_data, 'profile_image', null);
     
