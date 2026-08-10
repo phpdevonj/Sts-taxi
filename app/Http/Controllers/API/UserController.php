@@ -229,7 +229,7 @@ class UserController extends Controller
                 }
                 $user->last_actived_at = now();
                 $user->save();
-                
+                $user->tokens()->delete();
                 $success = $user;
                 $success['api_token'] = $user->createToken('auth_token')->plainTextToken;
                 $success['profile_image'] = getSingleMedia($user,'profile_image',null);
