@@ -60,7 +60,6 @@ class RideRequestDataTable extends DataTable
                 
                 $status = 'warning';
                 $payment_status = $payment_status = isset($riderequest->payment) ? ($riderequest->payment->payment_status == 'pending') ? '' : $riderequest->payment->payment_status : '' ;
-                
                 switch ($payment_status) {
                     case 'pending':
                         $status = 'warning';
