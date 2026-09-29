@@ -190,6 +190,11 @@ class RideRequestController extends Controller
             return json_message_response(__('message.ride_request_not_found', ['id' => $request->ride_request_id]), 404);
         }
 
+        // Only a driver with this ride's service approved AND active may bid.
+        if ($auth_user->user_type != 'driver' || !User::where('id', $driverID)->eligibleForService($rideRequest->service_id)->exists()) {
+            return json_message_response(__('message.ride.unauthorized_action'), 403);
+        }
+
         $existingBid = RideRequestBid::where('ride_request_id', $request->ride_request_id)
             ->where('driver_id', $driverID)
             ->first();
@@ -283,6 +288,10 @@ class RideRequestController extends Controller
         $driverIds = is_array(request('driver_id')) ? request('driver_id') : [request('driver_id')];
 
         if (request()->has('is_bid_accept') && request('is_bid_accept') == 1) {
+            // The chosen driver must still have this ride's service approved and active.
+            if (!User::where('id', $driverIds[0])->eligibleForService($riderequest->service_id)->exists()) {
+                return json_message_response(__('message.ride.unauthorized_action'), 403);
+            }
             $riderequest->driver_id = $driverIds[0];
             $riderequest->status = 'bid_accepted';
             $riderequest->max_time_for_find_driver_for_ride_request = 0;
@@ -358,6 +367,19 @@ class RideRequestController extends Controller
         return response()->json($response);
     }
 
+    /**
+     * The authenticated user must be the driver named in the request, and the ride's service must be
+     * admin-approved AND currently active for that driver.
+     */
+    private function driverMayAcceptService($service_id)
+    {
+        $user = auth()->user();
+        if (!$user || $user->user_type != 'driver' || !is_scalar(request('driver_id')) || (int) request('driver_id') !== (int) $user->id) {
+            return false;
+        }
+        return User::where('id', $user->id)->eligibleForService($service_id)->exists();
+    }
+
     public function acceptRideRequest(Request $request)
     {
         if( auth()->user()->status == 'banned' ) {
@@ -403,6 +425,10 @@ class RideRequestController extends Controller
             return json_message_response($message,400);
         }
         if( request()->has('is_accept') && request('is_accept') == 1 ) {
+            // Driver must have this ride's service approved by admin AND currently active.
+            if (!$this->driverMayAcceptService($riderequest->service_id)) {
+                return json_message_response(__('message.ride.unauthorized_action'), 403);
+            }
             $riderequest->driver_id = request('driver_id');
             $riderequest->status = 'accepted';
             $riderequest->max_time_for_find_driver_for_ride_request = 0;
@@ -978,6 +1004,9 @@ class RideRequestController extends Controller
         }
 
         if(request()->has('is_accept') && request('is_accept') == 1 ){
+            if (!$this->driverMayAcceptService($riderequest->service_id)) {
+                return json_message_response(__('message.ride.unauthorized_action'), 403);
+            }
             $riderequest->driver_id = request('driver_id');
             $riderequest->status = 'driver_accepted';
             $riderequest->max_time_for_find_driver_for_ride_request = 0;

@@ -727,7 +727,9 @@ class RideRequestController extends Controller
             $q->where(function ($query) use ($driverId, $now) {
                 // Case 1: Scheduled rides (apply 30-min & 5-hour rule, exclude cancelled drivers)
                 $query->where(function ($sub) use ($driverId, $now) {
+                    // only rides of services that are approved AND active for this driver
                     $sub->where('status', 'scheduled')
+                        ->whereIn('service_id', \App\Models\DriverService::where('driver_id', $driverId)->where('status', 1)->where('is_active', 1)->select('service_id'))
                         ->where(function ($time) use ($now) {
                             // Allow rides after 30 minutes from now (future rides only)
                             $time->where('scheduled_at', '>', $now->addMinutes(30));

@@ -101,6 +101,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('update-profile', [ API\UserController::class, 'updateProfile']);
     Route::post('change-password',[ API\UserController::class, 'changePassword']);
     Route::post('update-user-status', [ API\UserController::class, 'updateUserStatus']);
+    Route::get('driver-services', [ API\UserController::class, 'driverServices']);
+    Route::post('driver-active-services', [ API\UserController::class, 'updateActiveServices']);
     
     Route::post('delete-user-account', [ API\UserController::class, 'deleteUserAccount']);
 

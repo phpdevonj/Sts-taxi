@@ -49,7 +49,7 @@ trait RideRequestTrait {
                         ->where('status', 'active')
                         ->where('is_online',1)
                         ->where('is_available',1)
-                        ->where('service_id', $ride_request->service_id )
+                        ->eligibleForService($ride_request->service_id)
                         ->whereNotIn('id', $cancelled_driver_ids)
                         ->whereNotIn('id', $busy_driver_ids) // Exclude busy drivers
                         ->where('last_actived_at', '>=', $limitTime) // NEW CONDITION
@@ -315,7 +315,7 @@ trait RideRequestTrait {
                 ->where('status', 'active')
                 ->where('is_online', 1)
                 ->where('is_available', 1)
-                ->where('service_id', $ride_request->service_id)
+                ->eligibleForService($ride_request->service_id)
                 ->whereNotIn('id', $cancelled_driver_ids)
                 ->whereNotIn('id', $rejected_bid_driver_ids)
                 ->having('distance', '<=', $radius);

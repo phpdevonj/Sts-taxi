@@ -147,27 +147,20 @@
 
                                  <!-- Service List -->
                                 <div class="form-group col-md-6">
-                                    {{ Form::label('service_id', __('message.select_name',[ 'select' => __('message.service') ]),[ 'class' => 'form-control-label' ]) }} 
-                                    {{ Form::select('service_id', isset($id) ? [ optional($data->service)->id => optional($data->service)->name ] : [], old('service_id'), [
-                                            'class' => 'select2js form-group service',
-                                            'data-placeholder' => __('message.select_name',[ 'select' => __('message.service') ]),
-                                            'data-ajax--url' => route('ajax-list', ['type' => 'service']),
-                                        ])
-                                    }}
-                                </div>
-                                {{--
-                                <div class="form-group col-md-6">
                                     {{ Form::label('service_id', __('message.select_name',[ 'select' => __('message.service') ]),[ 'class' => 'form-control-label' ]) }}
                                     <br />
-                                    {{ Form::select('service_id[]', $selected_service, isset($id) ? $data->driverService->pluck('service_id') : null, [
+                                    {{ Form::hidden('service_ids_submitted', 1) }}
+                                    {{ Form::select('service_id[]', $selected_service ?? [], isset($id) ? $data->driverServices->pluck('service_id') : null, [
                                             'class' => 'select2js form-group service',
                                             'multiple' => 'multiple',
                                             'data-placeholder' => __('message.select_name',[ 'select' => __('message.service') ]),
                                             'data-ajax--url' => route('ajax-list', ['type' => 'service']),
                                         ])
                                     }}
+                                    @if(!empty($pending_services))
+                                        <small class="text-warning">Driver requested (pending): {{ $pending_services }}. Services left selected are approved on save; unselect to reject.</small>
+                                    @endif
                                 </div>
-                                --}}
                                 <div class="form-group col-md-6">
                                     <!-- {{ Form::label('car_model',__('message.car_model').' <span class="text-danger">*</span>',['class'=>'form-control-label'], false ) }}
                                     {{ Form::text('userDetail[car_model]', old('userDetail[car_model]'), ['class' => 'form-control', 'placeholder' => __('message.car_model')]) }} -->

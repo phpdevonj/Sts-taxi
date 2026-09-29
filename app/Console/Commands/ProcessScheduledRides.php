@@ -245,7 +245,7 @@ class ProcessScheduledRides extends Command
 
         $nearby_driver = User::selectRaw("id, user_type, player_id, latitude, longitude, ( $unit_value * acos( cos( radians($latitude) ) * cos( radians( latitude ) ) * cos( radians( longitude ) - radians($longitude) ) + sin( radians($latitude) ) * sin( radians( latitude ) ) ) ) AS distance")
                         ->where('user_type', 'driver')->where('status', 'active')->where('is_online',1)->where('is_available',1)
-                        ->where('service_id', $ride_request->service_id )
+                        ->eligibleForService($ride_request->service_id)
                         ->whereNotIn('id', $cancelled_driver_ids)
                         ->where('last_actived_at', '>=', $limitTime) // NEW CONDITION
                         ->having('distance', '<=', $radius)

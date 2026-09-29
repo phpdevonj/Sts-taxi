@@ -9,7 +9,7 @@ class DriverService extends Model
 {
     use HasFactory;
 
-    protected $fillable = [ 'driver_id', 'service_id', 'status' ];
+    protected $fillable = [ 'driver_id', 'service_id', 'status', 'is_active' ];
 
     public function driver() {
         return $this->belongsTo( User::class, 'driver_id', 'id');

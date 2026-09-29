@@ -98,7 +98,7 @@ class FindNearbyDriver extends Command
             ->where('status', 'active')
             ->where('is_online', 1)
             ->where('is_available', 1)
-            ->where('service_id', $request->service_id)
+            ->eligibleForService($request->service_id)
             ->whereNotIn('id', $cancelled_driver_ids)
             ->having('distance', '<=', $radius)
             ->orderBy('distance', 'asc');

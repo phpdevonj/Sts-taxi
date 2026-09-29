@@ -109,6 +109,65 @@ class User extends Authenticatable implements HasMedia
         return $this->belongsTo(Service::class, 'service_id', 'id');
     }
 
+    public function driverServices() {
+        return $this->hasMany(DriverService::class, 'driver_id', 'id');
+    }
+
+    /** Services the admin has approved for this driver. */
+    public function approvedDriverServices() {
+        return $this->driverServices()->where('status', 1);
+    }
+
+    /**
+     * Drivers eligible for a ride's service: service is admin-approved AND currently active for the driver.
+     */
+    public function scopeEligibleForService($query, $service_id) {
+        return $query->whereHas('driverServices', function ($q) use ($service_id) {
+            $q->where('service_id', $service_id)->where('status', 1)->where('is_active', 1);
+        });
+    }
+
+    /**
+     * Admin action: set the approved services. Requested/approved rows not in $service_ids are removed,
+     * kept rows preserve the driver's is_active choice, newly approved rows start active.
+     * users.service_id stays a valid approved service (primary/legacy).
+     */
+    public function syncApprovedServices(array $service_ids) {
+        $service_ids = Service::whereIn('id', array_filter($service_ids))->pluck('id')->all();
+
+        DriverService::where('driver_id', $this->id)->whereNotIn('service_id', $service_ids)->delete();
+        foreach ($service_ids as $service_id) {
+            $row = DriverService::where('driver_id', $this->id)->where('service_id', $service_id)->first();
+            if ($row) {
+                // newly approved (was only requested) starts active; already-approved rows keep the driver's choice
+                $row->update(['status' => 1] + ($row->status ? [] : ['is_active' => 1]));
+            } else {
+                DriverService::create(['driver_id' => $this->id, 'service_id' => $service_id, 'status' => 1, 'is_active' => 1]);
+            }
+        }
+
+        $primary = in_array($this->service_id, $service_ids) ? $this->service_id : ($service_ids[0] ?? null);
+        if ($this->service_id != $primary) {
+            $this->forceFill(['service_id' => $primary])->save();
+        }
+    }
+
+    /**
+     * Driver action: choose which ADMIN-APPROVED services are active. Never adds/removes approvals.
+     * Returns false (and changes nothing) if any id is not approved for this driver.
+     */
+    public function setActiveServices(array $service_ids) {
+        $service_ids = array_values(array_unique(array_map('intval', $service_ids)));
+        $approved = $this->approvedDriverServices()->pluck('service_id')->map(function ($id) { return (int) $id; })->all();
+
+        if (empty($service_ids) || count(array_diff($service_ids, $approved)) > 0) {
+            return false;
+        }
+        $this->approvedDriverServices()->whereIn('service_id', $service_ids)->update(['is_active' => 1]);
+        $this->approvedDriverServices()->whereNotIn('service_id', $service_ids)->update(['is_active' => 0]);
+        return true;
+    }
+
     public function riderRating(){
         return $this->hasMany(RideRequestRating::class, 'rider_id', 'id');
     }

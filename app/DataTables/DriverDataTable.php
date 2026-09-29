@@ -55,7 +55,10 @@ class DriverDataTable extends DataTable
                 return $status;
             })
             ->editColumn('service_id' , function ( $query ) {
-                return $query->service_id != null ? optional($query->service)->name : '';
+                $names = $query->driverServices->map(function ($ds) {
+                    return optional($ds->service)->name ? optional($ds->service)->name . ($ds->status ? '' : ' (' . __('message.pending') . ')') : null;
+                })->filter()->implode(', ');
+                return $names !== '' ? $names : ($query->service_id != null ? optional($query->service)->name : '');
             })
 
             ->editColumn('contact_number', function ($query) {
@@ -69,7 +72,7 @@ class DriverDataTable extends DataTable
             })
             
             ->filterColumn('service_id', function( $query, $keyword ){
-                $query->whereHas('service', function ($q) use($keyword){
+                $query->whereHas('driverServices.service', function ($q) use($keyword){
                     $q->where('name', 'like' , '%'.$keyword.'%');
                 });
             })
@@ -111,7 +114,7 @@ class DriverDataTable extends DataTable
      */
     public function query()
     {
-        $model = User::where('user_type','driver');
+        $model = User::where('user_type','driver')->with('driverServices.service');
         if(auth()->user()->hasRole('fleet')) {
             $model->where('fleet_id', auth()->user()->id);
         }
@@ -119,7 +122,7 @@ class DriverDataTable extends DataTable
             $model->where('id', request()->input('driver_id'));
         }
         if (request()->service_id) {
-            $model->where('service_id', request()->input('service_id'));
+            $model->whereHas('driverServices', function ($q) { $q->where('service_id', request()->input('service_id')); });
         }
         if (request()->contact_number) {
             $model->where('contact_number', 'like', '%' . request()->input('contact_number') . '%');

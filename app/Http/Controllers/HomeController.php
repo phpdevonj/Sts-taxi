@@ -463,7 +463,7 @@ class HomeController extends Controller
                     $items = User::selectRaw("id, display_name as text, status, is_online, is_available, last_location_update_at, user_type, latitude, longitude, ( $unit_value * acos( cos( radians($latitude) ) * cos( radians( latitude ) ) * cos( radians( longitude ) - radians($longitude) ) + sin( radians($latitude) ) * sin( radians( latitude ) ) ) ) AS distance")->where('user_type', 'driver')->where('status','active')
                         ->whereNotNull('latitude')->whereNotNull('longitude')
                         ->having('distance', '<=', $radius)
-                        ->where('service_id', $request->service_id )
+                        ->eligibleForService($request->service_id)
                         ->where('is_online',1)
                         ->where('is_available',1)
                         ->orderBy('distance','asc');
@@ -541,7 +541,7 @@ class HomeController extends Controller
                 ->where('status', 'active')
                 ->where('is_online', 1)
                 ->where('is_available', 1)
-                ->where('service_id', $ride_data->service_id)
+                ->eligibleForService($ride_data->service_id)
                 ->whereNotIn('id', $cancelled_driver_ids)
                 ->whereNotIn('id', $rejected_bid_driver_ids)
                 ->when($min_amount, function ($query) use ($min_amount) {

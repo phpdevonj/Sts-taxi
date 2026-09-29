@@ -47,8 +47,9 @@ class DriverController extends Controller
     {
         $pageTitle = __('message.add_form_title',[ 'form' => __('message.driver')]);
         $assets = ['phone'];
-        // $selected_service = [];
-        return view('driver.form', compact('pageTitle','assets'));
+        $selected_service = [];
+        $pending_services = '';
+        return view('driver.form', compact('pageTitle','assets','selected_service','pending_services'));
     }
 
     /**
@@ -113,7 +114,12 @@ class DriverController extends Controller
         ]);
         $request['uid'] = $uid;
 
+        // service_id arrives as an array (multi-select); users.service_id only holds the primary one.
+        $service_ids = array_values(array_filter((array) $request->service_id));
+        $request['service_id'] = $service_ids[0] ?? null;
+
         $user = User::create($request->all());
+        $user->syncApprovedServices($service_ids);
 
         uploadMediaFile($user,$request->profile_image, 'profile_image');
         $user->assignRole('driver');
@@ -122,22 +128,6 @@ class DriverController extends Controller
         $user->userBankAccount()->create($request->userBankAccount);
         
         $user->userWallet()->create(['total_amount' => 0 ]);
-/*
-        if($user->driverService()->count() > 0)
-        {
-            $user->driverService()->delete();
-        }
-
-        if($request->service_id != null) {
-            foreach($request->service_id as $service) {
-                $driver_services = [
-                    'service_id'    => $service->id,
-                    'driver_id'     => $user->id,
-                ];
-                $user->driverService()->insert($driver_services);
-            }
-        }
-*/
         return redirect()->route('driver.index')->withSuccess(__('message.save_form', ['form' => __('driver')]));
     }
 
@@ -238,12 +228,13 @@ class DriverController extends Controller
 
         $profileImage = getSingleMedia($data, 'profile_image');
         $assets = ['phone'];
-/* 
-        $selected_service = $data->driverService->mapWithKeys(function ($item) {
+        $selected_service = $data->driverServices->mapWithKeys(function ($item) {
             return [ $item->service_id => optional($item->service)->name ];
         });
-*/
-        return view('driver.form', compact('data', 'pageTitle', 'id', 'profileImage', 'assets'));
+        $pending_services = $data->driverServices->where('status', 0)->map(function ($item) {
+            return optional($item->service)->name;
+        })->filter()->implode(', ');
+        return view('driver.form', compact('data', 'pageTitle', 'id', 'profileImage', 'assets', 'selected_service', 'pending_services'));
     }
 
     /**
@@ -285,8 +276,20 @@ class DriverController extends Controller
             }
         }
 
+        // Admin is the final authority on the driver's approved services (service_id[] = approved list).
+        $sync_services = $request->has('service_ids_submitted');
+        $service_ids = array_values(array_filter((array) $request->service_id));
+        if ($sync_services) {
+            $request['service_id'] = $service_ids[0] ?? null;
+        } else {
+            $request->request->remove('service_id');
+        }
+
         // User user data...
         $user->fill($request->all())->update();
+        if ($sync_services) {
+            $user->syncApprovedServices($service_ids);
+        }
 
         // Save user image...
         if (isset($request->profile_image) && $request->profile_image != null) {
@@ -306,22 +309,6 @@ class DriverController extends Controller
             $user->userBankAccount()->create($request->userBankAccount);
         }
 
-        /*
-        if($user->driverService()->count() > 0)
-        {
-            $user->driverService()->delete();
-        }
-
-        if($request->service_id != null) {
-            foreach($request->service_id as $service) {
-                $driver_services = [
-                    'service_id'    => $service,
-                    'driver_id'     => $user->id,
-                ];
-                $user->driverService()->insert($driver_services);
-            }
-        }
-        */
 
         if(auth()->check()){
             return redirect()->route('driver.index')->withSuccess(__('message.update_form',['form' => __('message.driver')]));

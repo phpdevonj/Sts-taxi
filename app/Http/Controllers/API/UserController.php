@@ -126,6 +126,10 @@ class UserController extends Controller
     public function driverRegister(DriverRequest $request)
     {
         $input = $request->all();
+        // Drivers can only REQUEST services; admin approves. Never trust service/verification fields from the client.
+        $requested_service_ids = array_merge((array) ($input['service_ids'] ?? []), (array) ($input['service_id'] ?? []));
+        $requested_service_ids = \App\Models\Service::whereIn('id', array_filter($requested_service_ids, 'is_numeric'))->pluck('id')->all();
+        unset($input['service_id'], $input['service_ids'], $input['is_verified_driver']);
         $password = $input['password'];
         $input['user_type'] = isset($input['user_type']) ? $input['user_type'] : 'driver';
         $input['password'] = Hash::make($password);
@@ -142,6 +146,10 @@ class UserController extends Controller
         }        
         $user = User::create($input);
         $user->assignRole($input['user_type']);
+
+        foreach ($requested_service_ids as $service_id) {
+            $user->driverServices()->create(['service_id' => $service_id, 'status' => 0, 'is_active' => 0]);
+        }
 
         if( $request->has('user_detail') && $request->user_detail != null ) {
             $user->userDetail()->create($request->user_detail);
@@ -396,7 +404,8 @@ class UserController extends Controller
             }
         }
 
-        $user->fill($request->all())->update();
+        // service_id / is_verified_driver are admin-controlled; a driver must not set them here.
+        $user->fill($request->except(['service_id', 'service_ids', 'is_verified_driver']))->update();
 
         // fixed image upload issue
         if($request->hasFile('profile_image')) {
@@ -707,6 +716,14 @@ class UserController extends Controller
             $user->fcm_token = $request->fcm_token;
         }
         
+        // Optional: choose active services when going online (validated against the admin-approved list).
+        if ($request->has('active_service_ids')) {
+            $driver = auth()->user();
+            if (!$driver || $driver->user_type != 'driver' || !$driver->setActiveServices((array) $request->active_service_ids)) {
+                return json_message_response(__('message.ride.unauthorized_action'), 403);
+            }
+        }
+
         if($request->is_online == 1) {
             $user->is_available = 1;
         }
@@ -725,6 +742,42 @@ class UserController extends Controller
             'message' => $message
         ];
         return json_custom_response($response);
+    }
+
+    /**
+     * Driver: approved services with their active flag.
+     */
+    public function driverServices(Request $request)
+    {
+        $driver = auth()->user();
+        if ($driver->user_type != 'driver') {
+            return json_message_response(__('message.ride.unauthorized_action'), 403);
+        }
+        $rows = $driver->driverServices()->with('service')->get()->map(function ($ds) {
+            return [
+                'service_id' => (int) $ds->service_id,
+                'name' => optional($ds->service)->name,
+                'is_approved' => (int) $ds->status,
+                'is_active' => (int) $ds->is_active,
+            ];
+        });
+        return json_custom_response(['data' => $rows]);
+    }
+
+    /**
+     * Driver: choose which approved services to work with. Cannot add/remove approvals.
+     */
+    public function updateActiveServices(Request $request)
+    {
+        $driver = auth()->user();
+        if ($driver->user_type != 'driver') {
+            return json_message_response(__('message.ride.unauthorized_action'), 403);
+        }
+        $request->validate(['service_ids' => 'required|array|min:1', 'service_ids.*' => 'integer']);
+        if (!$driver->setActiveServices($request->service_ids)) {
+            return json_message_response(__('message.ride.unauthorized_action'), 403);
+        }
+        return $this->driverServices($request);
     }
 
     public function updateAppSetting(Request $request)
