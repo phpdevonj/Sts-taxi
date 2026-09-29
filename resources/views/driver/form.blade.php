@@ -145,21 +145,56 @@
                                 @endif
                                 --}}
 
-                                 <!-- Service List -->
-                                <div class="form-group col-md-6">
-                                    {{ Form::label('service_id', __('message.select_name',[ 'select' => __('message.service') ]),[ 'class' => 'form-control-label' ]) }}
-                                    <br />
+                                 <!-- Service review: admin approves / rejects the driver's requested services -->
+                                <div class="form-group col-md-12">
+                                    <label class="form-control-label">{{ __('message.service') }}</label>
                                     {{ Form::hidden('service_ids_submitted', 1) }}
-                                    {{ Form::select('service_id[]', $selected_service ?? [], isset($id) ? $data->driverServices->pluck('service_id') : null, [
+                                    @if(isset($id) && $data->driverServices->count() > 0)
+                                        <div class="table-responsive">
+                                            <table class="table table-bordered mb-2">
+                                                <thead>
+                                                    <tr><th>{{ __('message.service') }}</th><th>Status</th><th>Action</th></tr>
+                                                </thead>
+                                                <tbody>
+                                                @foreach($data->driverServices->sortBy('service_id') as $ds)
+                                                    <tr>
+                                                        <td>{{ optional($ds->service)->name ?? ('#'.$ds->service_id) }}</td>
+                                                        <td>
+                                                            @if($ds->status)
+                                                                <span class="badge text-success badge-light-success">Approved</span>
+                                                                <small class="text-muted">({{ $ds->is_active ? 'active' : 'inactive' }} today)</small>
+                                                            @else
+                                                                <span class="badge text-warning badge-light-warning">Requested by driver - pending</span>
+                                                            @endif
+                                                        </td>
+                                                        <td style="min-width:200px">
+                                                            <select name="service_action[{{ $ds->service_id }}]" class="form-control">
+                                                                @if($ds->status)
+                                                                    <option value="">Keep approved</option>
+                                                                    <option value="remove">Remove (unapprove)</option>
+                                                                @else
+                                                                    <option value="">Keep pending</option>
+                                                                    <option value="approve">Approve</option>
+                                                                    <option value="reject">Reject</option>
+                                                                @endif
+                                                            </select>
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    @else
+                                        <p class="text-muted mb-2">No services requested or approved yet.</p>
+                                    @endif
+                                    <label class="form-control-label">Add service (approved immediately)</label>
+                                    {{ Form::select('add_service_id[]', [], null, [
                                             'class' => 'select2js form-group service',
                                             'multiple' => 'multiple',
                                             'data-placeholder' => __('message.select_name',[ 'select' => __('message.service') ]),
                                             'data-ajax--url' => route('ajax-list', ['type' => 'service']),
                                         ])
                                     }}
-                                    @if(!empty($pending_services))
-                                        <small class="text-warning">Driver requested (pending): {{ $pending_services }}. Services left selected are approved on save; unselect to reject.</small>
-                                    @endif
                                 </div>
                                 <div class="form-group col-md-6">
                                     <!-- {{ Form::label('car_model',__('message.car_model').' <span class="text-danger">*</span>',['class'=>'form-control-label'], false ) }}

@@ -47,9 +47,7 @@ class DriverController extends Controller
     {
         $pageTitle = __('message.add_form_title',[ 'form' => __('message.driver')]);
         $assets = ['phone'];
-        $selected_service = [];
-        $pending_services = '';
-        return view('driver.form', compact('pageTitle','assets','selected_service','pending_services'));
+        return view('driver.form', compact('pageTitle','assets'));
     }
 
     /**
@@ -114,12 +112,11 @@ class DriverController extends Controller
         ]);
         $request['uid'] = $uid;
 
-        // service_id arrives as an array (multi-select); users.service_id only holds the primary one.
-        $service_ids = array_values(array_filter((array) $request->service_id));
-        $request['service_id'] = $service_ids[0] ?? null;
+        // users.service_id (primary) is managed by applyServiceDecisions(); services added here are approved.
+        $request->request->remove('service_id');
 
         $user = User::create($request->all());
-        $user->syncApprovedServices($service_ids);
+        $user->applyServiceDecisions([], (array) $request->add_service_id);
 
         uploadMediaFile($user,$request->profile_image, 'profile_image');
         $user->assignRole('driver');
@@ -224,17 +221,11 @@ class DriverController extends Controller
     public function edit($id)
     {
         $pageTitle = __('message.update_form_title',[ 'form' => __('message.driver')]);
-        $data = User::where('user_type', 'driver')->with('userDetail','userBankAccount')->findOrFail($id);
+        $data = User::where('user_type', 'driver')->with('userDetail','userBankAccount','driverServices.service')->findOrFail($id);
 
         $profileImage = getSingleMedia($data, 'profile_image');
         $assets = ['phone'];
-        $selected_service = $data->driverServices->mapWithKeys(function ($item) {
-            return [ $item->service_id => optional($item->service)->name ];
-        });
-        $pending_services = $data->driverServices->where('status', 0)->map(function ($item) {
-            return optional($item->service)->name;
-        })->filter()->implode(', ');
-        return view('driver.form', compact('data', 'pageTitle', 'id', 'profileImage', 'assets', 'selected_service', 'pending_services'));
+        return view('driver.form', compact('data', 'pageTitle', 'id', 'profileImage', 'assets'));
     }
 
     /**
@@ -276,19 +267,15 @@ class DriverController extends Controller
             }
         }
 
-        // Admin is the final authority on the driver's approved services (service_id[] = approved list).
+        // Admin is the final authority on the driver's services: per-service approve/reject/remove + add.
+        // users.service_id (primary) is managed by applyServiceDecisions(), never taken from the form.
         $sync_services = $request->has('service_ids_submitted');
-        $service_ids = array_values(array_filter((array) $request->service_id));
-        if ($sync_services) {
-            $request['service_id'] = $service_ids[0] ?? null;
-        } else {
-            $request->request->remove('service_id');
-        }
+        $request->request->remove('service_id');
 
         // User user data...
         $user->fill($request->all())->update();
         if ($sync_services) {
-            $user->syncApprovedServices($service_ids);
+            $user->applyServiceDecisions((array) $request->service_action, (array) $request->add_service_id);
         }
 
         // Save user image...

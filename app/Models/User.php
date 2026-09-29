@@ -153,6 +153,39 @@ class User extends Authenticatable implements HasMedia
     }
 
     /**
+     * Admin review of a driver's services.
+     * $actions: [service_id => 'approve'|'reject'|'remove'] applied to the driver's existing rows
+     *           (approve: requested -> approved & active; reject/remove: row deleted; anything else: no change).
+     * $add:     service ids to add as approved (a pending request for the same service is approved).
+     * users.service_id is kept pointing at an approved service (or null).
+     */
+    public function applyServiceDecisions(array $actions, array $add = []) {
+        foreach ($this->driverServices()->get() as $row) {
+            $action = $actions[$row->service_id] ?? null;
+            if ($action === 'approve' && !$row->status) {
+                $row->update(['status' => 1, 'is_active' => 1]);
+            } elseif (in_array($action, ['reject', 'remove'], true)) {
+                $row->delete();
+            }
+        }
+
+        foreach (Service::whereIn('id', array_filter($add))->pluck('id') as $service_id) {
+            $row = DriverService::where('driver_id', $this->id)->where('service_id', $service_id)->first();
+            if (!$row) {
+                DriverService::create(['driver_id' => $this->id, 'service_id' => $service_id, 'status' => 1, 'is_active' => 1]);
+            } elseif (!$row->status) {
+                $row->update(['status' => 1, 'is_active' => 1]);
+            }
+        }
+
+        $approved = $this->approvedDriverServices()->pluck('service_id')->all();
+        $primary = in_array($this->service_id, $approved) ? $this->service_id : ($approved[0] ?? null);
+        if ($this->service_id != $primary) {
+            $this->forceFill(['service_id' => $primary])->save();
+        }
+    }
+
+    /**
      * Driver action: choose which ADMIN-APPROVED services are active. Never adds/removes approvals.
      * Returns false (and changes nothing) if any id is not approved for this driver.
      */
