@@ -757,7 +757,8 @@ class UserController extends Controller
             return [
                 'service_id' => (int) $ds->service_id,
                 'name' => optional($ds->service)->name,
-                'is_approved' => (int) $ds->status,
+                'is_approved' => (int) ($ds->status == 1),
+                'approval_status' => [0 => 'pending', 1 => 'approved', 2 => 'rejected'][(int) $ds->status] ?? 'pending',
                 'is_active' => (int) $ds->is_active,
             ];
         });

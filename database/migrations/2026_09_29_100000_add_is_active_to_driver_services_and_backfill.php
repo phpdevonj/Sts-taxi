@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * driver_services.status    : 1 = approved by admin, 0 = requested by driver (pending review)
+ * driver_services.status    : 1 = approved by admin, 0 = requested by driver (pending review), 2 = rejected/unapproved by admin
  * driver_services.is_active : driver's own day/session choice among approved services
  *
  * users.service_id is kept as the driver's "primary" service for backward compatibility.

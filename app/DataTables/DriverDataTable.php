@@ -56,7 +56,7 @@ class DriverDataTable extends DataTable
             })
             ->editColumn('service_id' , function ( $query ) {
                 $names = $query->driverServices->map(function ($ds) {
-                    return optional($ds->service)->name ? optional($ds->service)->name . ($ds->status ? '' : ' (' . __('message.pending') . ')') : null;
+                    return optional($ds->service)->name ? optional($ds->service)->name . ([1 => '', 2 => ' (Rejected)'][(int) $ds->status] ?? ' (' . __('message.pending') . ')') : null;
                 })->filter()->implode(', ');
                 return $names !== '' ? $names : ($query->service_id != null ? optional($query->service)->name : '');
             })

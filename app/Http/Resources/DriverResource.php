@@ -55,6 +55,7 @@ class DriverResource extends JsonResource
                 return ['service_id' => (int) $ds->service_id, 'name' => optional($ds->service)->name, 'is_active' => (int) $ds->is_active];
             })->values(),
             'requested_service_ids' => $this->driverServices->where('status', 0)->pluck('service_id')->values(),
+            'rejected_service_ids' => $this->driverServices->where('status', 2)->pluck('service_id')->values(),
             'active_service_ids' => $this->driverServices->where('status', 1)->where('is_active', 1)->pluck('service_id')->values(),
             'is_verified_driver' => (int) $this->is_verified_driver,
             'last_notification_seen' => $this->last_notification_seen,

@@ -160,18 +160,23 @@
                                                     <tr>
                                                         <td>{{ optional($ds->service)->name ?? ('#'.$ds->service_id) }}</td>
                                                         <td>
-                                                            @if($ds->status)
+                                                            @if($ds->status == 1)
                                                                 <span class="badge text-success badge-light-success">Approved</span>
                                                                 <small class="text-muted">({{ $ds->is_active ? 'active' : 'inactive' }} today)</small>
+                                                            @elseif($ds->status == 2)
+                                                                <span class="badge text-danger badge-light-danger">Rejected / Unapproved</span>
                                                             @else
                                                                 <span class="badge text-warning badge-light-warning">Requested by driver - pending</span>
                                                             @endif
                                                         </td>
                                                         <td style="min-width:200px">
                                                             <select name="service_action[{{ $ds->service_id }}]" class="form-control">
-                                                                @if($ds->status)
+                                                                @if($ds->status == 1)
                                                                     <option value="">Keep approved</option>
                                                                     <option value="remove">Remove (unapprove)</option>
+                                                                @elseif($ds->status == 2)
+                                                                    <option value="">Keep rejected</option>
+                                                                    <option value="approve">Approve</option>
                                                                 @else
                                                                     <option value="">Keep pending</option>
                                                                     <option value="approve">Approve</option>

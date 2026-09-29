@@ -128,44 +128,20 @@ class User extends Authenticatable implements HasMedia
     }
 
     /**
-     * Admin action: set the approved services. Requested/approved rows not in $service_ids are removed,
-     * kept rows preserve the driver's is_active choice, newly approved rows start active.
-     * users.service_id stays a valid approved service (primary/legacy).
-     */
-    public function syncApprovedServices(array $service_ids) {
-        $service_ids = Service::whereIn('id', array_filter($service_ids))->pluck('id')->all();
-
-        DriverService::where('driver_id', $this->id)->whereNotIn('service_id', $service_ids)->delete();
-        foreach ($service_ids as $service_id) {
-            $row = DriverService::where('driver_id', $this->id)->where('service_id', $service_id)->first();
-            if ($row) {
-                // newly approved (was only requested) starts active; already-approved rows keep the driver's choice
-                $row->update(['status' => 1] + ($row->status ? [] : ['is_active' => 1]));
-            } else {
-                DriverService::create(['driver_id' => $this->id, 'service_id' => $service_id, 'status' => 1, 'is_active' => 1]);
-            }
-        }
-
-        $primary = in_array($this->service_id, $service_ids) ? $this->service_id : ($service_ids[0] ?? null);
-        if ($this->service_id != $primary) {
-            $this->forceFill(['service_id' => $primary])->save();
-        }
-    }
-
-    /**
-     * Admin review of a driver's services.
+     * Admin review of a driver's services. driver_services.status: 0 = requested (pending), 1 = approved, 2 = rejected/unapproved.
+     * Rows are never deleted by review, so admin (and the driver) can still see rejected/unapproved services and re-approve them.
      * $actions: [service_id => 'approve'|'reject'|'remove'] applied to the driver's existing rows
-     *           (approve: requested -> approved & active; reject/remove: row deleted; anything else: no change).
-     * $add:     service ids to add as approved (a pending request for the same service is approved).
+     *           (approve: any non-approved row -> approved & active; reject/remove: row -> rejected, inactive; else no change).
+     * $add:     service ids to add as approved (an existing pending/rejected row for the same service is approved).
      * users.service_id is kept pointing at an approved service (or null).
      */
     public function applyServiceDecisions(array $actions, array $add = []) {
         foreach ($this->driverServices()->get() as $row) {
             $action = $actions[$row->service_id] ?? null;
-            if ($action === 'approve' && !$row->status) {
+            if ($action === 'approve' && $row->status != 1) {
                 $row->update(['status' => 1, 'is_active' => 1]);
-            } elseif (in_array($action, ['reject', 'remove'], true)) {
-                $row->delete();
+            } elseif (in_array($action, ['reject', 'remove'], true) && $row->status != 2) {
+                $row->update(['status' => 2, 'is_active' => 0]);
             }
         }
 
@@ -173,7 +149,7 @@ class User extends Authenticatable implements HasMedia
             $row = DriverService::where('driver_id', $this->id)->where('service_id', $service_id)->first();
             if (!$row) {
                 DriverService::create(['driver_id' => $this->id, 'service_id' => $service_id, 'status' => 1, 'is_active' => 1]);
-            } elseif (!$row->status) {
+            } elseif ($row->status != 1) {
                 $row->update(['status' => 1, 'is_active' => 1]);
             }
         }
