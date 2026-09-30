@@ -41,6 +41,9 @@ class AdditionalFeesDataTable extends DataTable
                 }
                 return '<span class="text-capitalize text-' . $status . ' badge badge-light-' . $status . '" data-bs-toggle="tooltip" data-bs-placement="top" title="'.$status_label.'">' . $status_label . '</span>';
             })
+            ->editColumn('fee', function ($query) {
+                return getPriceFormat($query->fee);
+            })
             ->editColumn('created_at', function ($query) {
                 return dateAgoFormate($query->created_at, true);
             })
@@ -90,6 +93,7 @@ class AdditionalFeesDataTable extends DataTable
                 ->orderable(false)
                 ->width(60),
             Column::make('title')->title( __('message.title') ),
+            Column::make('fee')->title( __('message.fee') ),
             Column::make('status')->title( __('message.status') ),
             Column::make('created_at')->title( __('message.created_at') ),
             Column::computed('action')

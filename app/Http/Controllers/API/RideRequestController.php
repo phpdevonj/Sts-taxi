@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\RideRequest;
 use App\Models\RideRequestRating;
 use App\Models\Coupon;
+use App\Models\AdditionalFees;
 use App\Http\Resources\RideRequestResource;
 use App\Http\Resources\ComplaintResource;
 use App\Http\Resources\EstimateServiceResource;
@@ -215,12 +216,34 @@ class RideRequestController extends Controller
             return json_message_response( __('message.ride.completed'));
         }
 
+        // Additional fee amounts are fixed by admin; ignore any amount sent by the driver.
+        $extra_charges = [];
+        $extra_charges_amount = 0;
+        $selected_fees = is_array($request->extra_charges) ? $request->extra_charges : [];
+        foreach ($selected_fees as $selected_fee) {
+            $fee_id = is_array($selected_fee) ? ($selected_fee['id'] ?? null) : $selected_fee;
+            $fee_key = is_array($selected_fee) ? ($selected_fee['key'] ?? null) : null;
+            $additional_fee = AdditionalFees::where('status', 1)
+                ->when($fee_id, fn ($q) => $q->where('id', $fee_id), fn ($q) => $q->where('title', $fee_key))
+                ->first();
+            if ($additional_fee == null) {
+                continue;
+            }
+            $extra_charges[] = [
+                'id'         => $additional_fee->id,
+                'key'        => $additional_fee->title,
+                'value'      => $additional_fee->fee,
+                'value_type' => 'fixed',
+            ];
+            $extra_charges_amount += $additional_fee->fee;
+        }
+
         $ride_request->update([
             'end_latitude'  => $request->end_latitude,
             'end_longitude' => $request->end_longitude,
             'end_address'   => $request->end_address,
-            'extra_charges' => $request->extra_charges,
-            'extra_charges_amount'  => $request->extra_charges_amount
+            'extra_charges' => $extra_charges,
+            'extra_charges_amount'  => $extra_charges_amount
         ]);
 
         $distance_unit = $ride_request->distance_unit ?? 'km';
@@ -258,7 +281,6 @@ class RideRequestController extends Controller
 
         $current_date = Carbon::today()->toDateTimeString();
         $coupon = Coupon::where('id', $ride_request->coupon_code)->where('start_date', '<=',$current_date)->where('end_date', '>=',$current_date)->first();
-        $extra_charges_amount = $request->has('extra_charges_amount') ? request('extra_charges_amount') : 0;
 
         // get timezone
         $timezone = optional($service->region)->timezone ?? 'UTC';

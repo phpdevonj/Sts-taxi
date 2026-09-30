@@ -719,9 +719,17 @@ class UserController extends Controller
         // Optional: choose active services when going online (validated against the admin-approved list).
         if ($request->has('active_service_ids')) {
             $driver = auth()->user();
+            if ($driver && $driver->user_type == 'driver' && empty(array_filter((array) $request->active_service_ids))) {
+                return json_message_response('At least one active service is required.', 422);
+            }
             if (!$driver || $driver->user_type != 'driver' || !$driver->setActiveServices((array) $request->active_service_ids)) {
                 return json_message_response(__('message.ride.unauthorized_action'), 403);
             }
+        }
+
+        // A driver must have at least one active (admin-approved) service to go online.
+        if ($request->is_online == 1 && $user->user_type == 'driver' && !$user->hasActiveService()) {
+            return json_message_response('At least one active service is required to go online.', 422);
         }
 
         if($request->is_online == 1) {

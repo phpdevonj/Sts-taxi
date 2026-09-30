@@ -9,5 +9,9 @@ class AdditionalFees extends Model
 {
     use HasFactory;
 
-    protected $fillable = [ 'title', 'status' ];
+    protected $fillable = [ 'title', 'fee', 'status' ];
+
+    protected $casts = [
+        'fee' => 'double',
+    ];
 }

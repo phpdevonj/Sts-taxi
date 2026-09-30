@@ -159,6 +159,15 @@ class User extends Authenticatable implements HasMedia
         if ($this->service_id != $primary) {
             $this->forceFill(['service_id' => $primary])->save();
         }
+
+        // A driver with approved services always keeps at least one active (e.g. admin removed the only active one).
+        if ($primary !== null && !$this->approvedDriverServices()->where('is_active', 1)->exists()) {
+            $this->approvedDriverServices()->where('service_id', $primary)->update(['is_active' => 1]);
+        }
+    }
+
+    public function hasActiveService() {
+        return $this->approvedDriverServices()->where('is_active', 1)->exists();
     }
 
     /**

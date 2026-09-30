@@ -27,6 +27,11 @@
                                 </div>
 
                                 <div class="form-group col-md-4">
+                                    {{ Form::label('fee', __('message.fee').' <span class="text-danger">*</span>',['class' => 'form-control-label'], false ) }}
+                                    {{ Form::number('fee', old('fee'),[ 'placeholder' => __('message.fee'),'class' =>'form-control','required','min' => 0,'step' => 'any']) }}
+                                </div>
+
+                                <div class="form-group col-md-4">
                                     {{ Form::label('status',__('message.status').' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
                                     {{ Form::select('status',[ '1' => __('message.active'), '0' => __('message.inactive') ], old('status'), [ 'class' =>'form-control select2js','required']) }}
                                 </div>

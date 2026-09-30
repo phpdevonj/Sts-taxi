@@ -42,6 +42,12 @@ class AdditionalFeesController extends Controller
      */
     public function store(Request $request)
     {
+        $request->validate([
+            'title'  => 'required|string|max:255',
+            'fee'    => 'required|numeric|min:0',
+            'status' => 'required|in:0,1',
+        ]);
+
         $additionalfees = AdditionalFees::create($request->all());
 
         return redirect()->route('additionalfees.index')->withSuccess(__('message.save_form', ['form' => __('message.additionalfees')]));
@@ -85,6 +91,12 @@ class AdditionalFeesController extends Controller
     public function update(Request $request, $id)
     {
         $additionalfees = AdditionalFees::findOrFail($id);
+
+        $request->validate([
+            'title'  => 'required|string|max:255',
+            'fee'    => 'required|numeric|min:0',
+            'status' => 'required|in:0,1',
+        ]);
 
         // AdditionalFees data...
         $additionalfees->fill($request->all())->update();

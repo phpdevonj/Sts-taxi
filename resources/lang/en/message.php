@@ -228,6 +228,7 @@ return array(
     'female' => 'Female',
     'other' => 'Other',
     'additionalfees' => 'Additional Fees',
+    'fee' => 'Fee',
     'document' => 'Document',
     'document_type' => 'Document Type',
     'is_required' => 'Is Required',
