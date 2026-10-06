@@ -121,18 +121,30 @@ class CommonNotification extends Notification
                     //     ],
                     // ],
                     'apns' => [
+                        'headers' => [
+                            'apns-priority' => '10',
+                            'apns-push-type' => 'alert',
+                        ],
+
                         'payload' => [
                             'aps' => [
-                                'category' => $this->data['type'] === 'new_ride_requested' ? 'RIDE_NOTIFICATION_CATEGORY' : 'GENERAL',
-                                //'mutable-content' => 1,
+                                'category' => $this->data['type'] === 'new_ride_requested'
+                                    ? 'RIDE_NOTIFICATION_CATEGORY'
+                                    : 'GENERAL',
+
                                 'alert' => [
                                     'title' => $title,
                                     'body'  => $body,
                                 ],
-                                'sound' => 'wayvers_alert.caf',
+
+                                'sound' => 'sts_alerts_15s.caf',
+
+                                'mutable-content' => 1,
+
+                                'interruption-level' => 'time-sensitive',
                             ],
                         ],
-                    ]
+                    ],
                 ],
             ];
 
@@ -153,7 +165,7 @@ class CommonNotification extends Notification
                     'amount' => (string)($this->data['amount'] ?? ''),
                     'distance_time' => (string)($this->data['distance_time'] ?? ''),
                     'estimate' => (string)($this->data['estimate'] ?? ''),
-                    'sound' => (string)($this->data['sound'] ?? 'wayvers_alert'),
+                    'sound' => (string)($this->data['sound'] ?? 'sts_alerts'),
                     'channel_id' => (string)($this->data['channel_id'] ?? '8255b561-8321-4bb1-a875-d2dfabbf848b'),
                     'buttons' => json_encode($buttons),
                 ];
