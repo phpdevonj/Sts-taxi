@@ -845,4 +845,7 @@ return array(
     'modified' => 'Modified',
     'ride_modified' => 'Ride Modified',
     'wayvers_fees' => 'STS Fees',
+    'services' => 'Services',
+    'more_count' => '+:count more',
+    'show_details' => 'Show details',
 );

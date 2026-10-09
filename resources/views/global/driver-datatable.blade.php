@@ -75,6 +75,16 @@
     </div>
 
 
+    <style>
+        #dataTableBuilder tbody tr:not(.child-row):has(.driver-row-toggle) { cursor: pointer; }
+        #dataTableBuilder td { white-space: nowrap; }
+        #dataTableBuilder .driver-address { max-width: 200px; vertical-align: middle; }
+        #dataTableBuilder .driver-service-badge { max-width: 140px; vertical-align: middle; }
+        #dataTableBuilder .driver-row-toggle .fa-chevron-right { transition: transform .15s ease; }
+        #dataTableBuilder tr.shown .driver-row-toggle .fa-chevron-right { transform: rotate(90deg); }
+        #dataTableBuilder tr.child-row > td { white-space: normal; background: rgba(0, 0, 0, .02); }
+    </style>
+
     @section('bottom_script')
         {{ $dataTable->scripts() }}
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
@@ -90,6 +100,27 @@
                     table.ajax.url('{{ route('driver.index') }}?' + formData).load();
                 });
                
+                // Expand a driver row to show all services and full details
+                $('#dataTableBuilder tbody').on('click', 'tr:not(.child-row)', function(e) {
+                    if ($(e.target).closest('a, input, select, textarea, label, form, .dropdown-menu').length) return;
+                    if ($(e.target).closest('button').length && !$(e.target).closest('.driver-row-toggle').length) return;
+                    var table = $('#dataTableBuilder').DataTable();
+                    var tr = $(this);
+                    var row = table.row(tr);
+                    // Drivers with a single service have no toggle, so nothing to expand
+                    if (!row.data() || !tr.find('.driver-row-toggle').length) return;
+                    var wasShown = row.child.isShown();
+                    // Only one row open at a time: collapse every expanded row first
+                    table.rows('.shown').every(function() {
+                        this.child.hide();
+                        $(this.node()).removeClass('shown').find('.driver-row-toggle[aria-expanded]').attr('aria-expanded', 'false');
+                    });
+                    if (!wasShown) {
+                        row.child(row.data().details, 'child-row').show();
+                        tr.addClass('shown').find('.driver-row-toggle[aria-expanded]').attr('aria-expanded', 'true');
+                    }
+                });
+
                 $('#reset-filter-btn').on('click', function(e) {
                     e.preventDefault();
                     $('#driver_id').val('').trigger('change');  

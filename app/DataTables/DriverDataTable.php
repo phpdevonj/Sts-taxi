@@ -13,7 +13,9 @@ use App\Traits\DataTableTrait;
 
 class DriverDataTable extends DataTable
 {
-    use DataTableTrait;
+    use DataTableTrait {
+        getBuilderParameters as baseBuilderParameters;
+    }
     /**
      * Build DataTable class.
      *
@@ -55,10 +57,39 @@ class DriverDataTable extends DataTable
                 return $status;
             })
             ->editColumn('service_id' , function ( $query ) {
-                $names = $query->driverServices->map(function ($ds) {
-                    return optional($ds->service)->name ? optional($ds->service)->name . ([1 => '', 2 => ' (Rejected)'][(int) $ds->status] ?? ' (' . __('message.pending') . ')') : null;
-                })->filter()->implode(', ');
-                return $names !== '' ? $names : ($query->service_id != null ? optional($query->service)->name : '');
+                $services = $this->driverServiceList($query);
+                if ($services->isEmpty()) {
+                    return '<span class="text-muted">-</span>';
+                }
+                $first = $services->first();
+                $html = '<span class="driver-service-summary" title="'.e($services->pluck('label')->implode(', ')).'">'
+                    .'<span class="badge badge-light-'.$first['color'].' text-'.$first['color'].' text-truncate driver-service-badge">'.e($first['label']).'</span>';
+                if ($services->count() > 1) {
+                    $html .= ' <button type="button" class="badge rounded-pill bg-light text-dark border-0 driver-row-toggle" aria-label="'.e(__('message.show_details')).'">'
+                        .__('message.more_count', ['count' => $services->count() - 1]).'</button>';
+                }
+                return $html.'</span>';
+            })
+            ->editColumn('address', function ($query) {
+                if (!$query->address) {
+                    return '-';
+                }
+                return '<span class="d-inline-block text-truncate driver-address" title="'.e($query->address).'">'.e($query->address).'</span>';
+            })
+            ->addColumn('services_text', function ($query) {
+                return $this->driverServiceList($query)->pluck('label')->implode(', ');
+            })
+            ->addColumn('expand', function ($query) {
+                if ($this->driverServiceList($query)->count() <= 1) {
+                    return '';
+                }
+                return '<button type="button" class="btn btn-sm btn-link p-0 text-dark driver-row-toggle" aria-expanded="false" aria-label="'.e(__('message.show_details')).'"><i class="fas fa-chevron-right"></i></button>';
+            })
+            ->addColumn('details', function ($query) {
+                return view('driver.list-details', [
+                    'driver'   => $query,
+                    'services' => $this->driverServiceList($query),
+                ])->render();
             })
 
             ->editColumn('contact_number', function ($query) {
@@ -72,7 +103,7 @@ class DriverDataTable extends DataTable
             })
             
             ->filterColumn('service_id', function( $query, $keyword ){
-                $query->whereHas('driverServices.service', function ($q) use($keyword){
+                $query->whereHas('approvedDriverServices.service', function ($q) use($keyword){
                     $q->where('name', 'like' , '%'.$keyword.'%');
                 });
             })
@@ -103,7 +134,25 @@ class DriverDataTable extends DataTable
                     $query->orderBy($column_name, $direction);
                 }
             })
-            ->rawColumns(['action','status', 'is_verified_driver','display_name']);
+            ->rawColumns(['action','status', 'is_verified_driver','display_name','service_id','address','expand','details']);
+    }
+
+    /**
+     * Driver's approved services as [label, color] pairs; falls back to the legacy
+     * single service_id only for drivers that have no driver_services rows at all.
+     */
+    protected function driverServiceList($driver)
+    {
+        $services = $driver->approvedDriverServices->filter(function ($ds) {
+            return optional($ds->service)->name;
+        })->map(function ($ds) {
+            return ['label' => $ds->service->name, 'color' => 'success'];
+        })->values();
+
+        if ($driver->driver_services_count == 0 && $driver->service_id != null && optional($driver->service)->name) {
+            $services->push(['label' => $driver->service->name, 'color' => 'success']);
+        }
+        return $services;
     }
 
     /**
@@ -114,7 +163,7 @@ class DriverDataTable extends DataTable
      */
     public function query()
     {
-        $model = User::where('user_type','driver')->with('driverServices.service');
+        $model = User::where('user_type','driver')->with('approvedDriverServices.service')->withCount('driverServices');
         if(auth()->user()->hasRole('fleet')) {
             $model->where('fleet_id', auth()->user()->id);
         }
@@ -122,7 +171,7 @@ class DriverDataTable extends DataTable
             $model->where('id', request()->input('driver_id'));
         }
         if (request()->service_id) {
-            $model->whereHas('driverServices', function ($q) { $q->where('service_id', request()->input('service_id')); });
+            $model->whereHas('approvedDriverServices', function ($q) { $q->where('service_id', request()->input('service_id')); });
         }
         if (request()->contact_number) {
             $model->where('contact_number', 'like', '%' . request()->input('contact_number') . '%');
@@ -156,6 +205,12 @@ class DriverDataTable extends DataTable
     protected function getColumns()
     {
         return [
+            Column::computed('expand')
+                ->title('')
+                ->exportable(false)
+                ->printable(false)
+                ->width(20)
+                ->addClass('text-center'),
             Column::make('DT_RowIndex')
                 ->searchable(false)
                 ->title(__('message.srno'))
@@ -175,6 +230,29 @@ class DriverDataTable extends DataTable
                   ->width(60)
                   ->addClass('text-center'),
         ];
+    }
+
+    /**
+     * Export the full service list instead of the compact badge summary.
+     */
+    public function getBuilderParameters(): array
+    {
+        $parameters = $this->baseBuilderParameters();
+        $exportOptions = [
+            'columns' => ':visible:not(:first-child)',
+            'format' => [
+                'body' => "function (data, row, column, node) {
+                    if ($(node).find('.driver-service-summary').length) {
+                        return $('#dataTableBuilder').DataTable().row(row).data().services_text;
+                    }
+                    return $('<div>').html(data).text().trim();
+                }",
+            ],
+        ];
+        foreach ($parameters['buttons'] as &$button) {
+            $button['exportOptions'] = $exportOptions;
+        }
+        return $parameters;
     }
 
     /**
